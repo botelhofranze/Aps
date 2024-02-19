@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logística</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+        }
+
+        #container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        label.upload {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+
+        label.upload:hover {
+            background-color: #2980b9;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
+            table-layout: fixed;
+        }
+
+        th, td {
+            border: 1px solid #dddddd;
+            padding: 8px;
+            text-align: left;
+            overflow-wrap: break-word;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        select, input[type="text"] {
+            padding: 8px;
+            width: 100%;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+
+        #selecaoLoteContainer, #detalhesLoteContainer, #tabelaContainer {
+            display: none;
+        }
+
+        #tabelaContainer {
+            max-height: calc(100vh - 400px); /* Ajuste o valor conforme necessário */
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        #detalhesLoteContainer {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <h1>Logística</h1>
+    <div>
+        <label class="upload" for="fileInput">Importar</label>
+        <input type="file" id="fileInput" onchange="importarDados()">
+        <button id="resetBtn" onclick="resetar()">Resetar</button>
+    </div>
+
+    <div id="selecaoProdutoContainer">
+        <label for="selectProduto">Selecione o Produto:</label>
+        <select id="selectProduto" onchange="updateLotes()">
+            <option value="">Selecione...</option>
+        </select>
+    </div>
+
+    <div id="selecaoLoteContainer">
+        <label for="selectLote">Selecione o Lote:</label>
+        <select id="selectLote" onchange="exibirDetalhes()">
+            <option value="">Selecione...</option>
+        </select>
+    </div>
+
+    <div id="detalhesLoteContainer">
+        <h2>Detalhes do Lote</h2>
+        <p id="detalhesLote"></p>
+    </div>
+
+    <button id="exibirPlanilhaBtn" onclick="exibirPlanilha()">Exibir Planilha</button>
+    <button id="incluirBtn" onclick="incluirLinha()">Incluir</button>
+    <button id="baixarBtn" onclick="baixarPlanilha()">Baixar Planilha</button>
+
+    <div id="tabelaContainer">
+        <table id="tabelaDados">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Lote</th>
+                    <th>Validade</th>
+                    <th>Quantidade</th>
+                    <th>Endereço</th>
+                    <th>Excluir</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaCorpo"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let dados = JSON.parse(localStorage.getItem('dados')) || [];
+    let produtos = JSON.parse(localStorage.getItem('produtos')) || {};
+
+    function importarDados() {
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const data = event.target.result;
+                const linhas = data.split('\n');
+                linhas.forEach(linha => {
+                    const [nome, lote, validade, quantidade, endereco] = linha.split('\t');
+                    if (nome && lote && validade && quantidade && endereco) {
+                        dados.push({ nome, lote, validade, quantidade, endereco });
+                        if (!produtos[nome]) {
+                            produtos[nome] = [];
+                        }
+                        produtos[nome].push({ lote, validade, quantidade, endereco });
+                    }
+                });
+                console.log("Dados importados:", linhas.length, "linhas");
+                exibirMensagem("Planilha importada com sucesso.");
+                exibirSelecaoProduto();
+            };
+            reader.readAsText(file);
+        }
+    }
+
+    function exibirMensagem(mensagem) {
+        alert(mensagem);
+    }
+
+    function exibirSelecaoProduto() {
+        const selecaoProdutoContainer = document.getElementById('selecaoProdutoContainer');
+        const selectProduto = document.getElementById('selectProduto');
+        selectProduto.innerHTML = '<option value="">Selecione...</option>';
+        for (const produto in produtos) {
+            const option = document.createElement('option');
+            option.value = produto;
+            option.textContent = produto;
+            selectProduto.appendChild(option);
+        }
+        selecaoProdutoContainer.style.display = 'block';
+    }
+
+    function updateLotes() {
+        const selectProduto = document.getElementById('selectProduto');
+        const produtoSelecionado = selectProduto.value;
+        const selecaoLoteContainer = document.getElementById('selecaoLoteContainer');
+        const selectLote = document.getElementById('selectLote');
+        selectLote.innerHTML = '<option value="">Selecione...</option>';
+        produtos[produtoSelecionado].forEach(lote => {
+            const option = document.createElement('option');
+            option.value = lote.lote;
+            option.textContent = lote.lote;
+            selectLote.appendChild(option);
+        });
+        selecaoLoteContainer.style.display = 'block';
+    }
+
+    function exibirDetalhes() {
+        const selectProduto = document.getElementById('selectProduto');
+        const produtoSelecionado = selectProduto.value;
+        const selectLote = document.getElementById('selectLote');
+        const loteSelecionado = selectLote.value;
+        const detalhesLoteContainer = document.getElementById('detalhesLoteContainer');
+        const detalhesLote = document.getElementById('detalhesLote');
+        const detalhes = produtos[produtoSelecionado].find(lote => lote.lote === loteSelecionado);
+        detalhesLote.textContent = `Lote: ${detalhes.lote} | Validade: ${detalhes.validade} | Quantidade: ${detalhes.quantidade} | Endereço: ${detalhes.endereco}`;
+        detalhesLoteContainer.style.display = 'block';
+    }
+
+    function exibirPlanilha() {
+        const tabelaContainer = document.getElementById('tabelaContainer');
+        const btnExibirPlanilha = document.getElementById('exibirPlanilhaBtn');
+        if (tabelaContainer.style.display === 'none') {
+            const tabelaCorpo = document.getElementById('tabelaCorpo');
+            tabelaCorpo.innerHTML = '';
+
+            // Ordena os dados por nome do produto
+            dados.sort((a, b) => a.nome.localeCompare(b.nome));
+
+            dados.forEach((dado, index) => {
+                const row = tabelaCorpo.insertRow();
+                row.insertCell(0).textContent = dado.nome;
+                row.insertCell(1).textContent = dado.lote;
+                row.insertCell(2).textContent = dado.validade;
+                row.insertCell(3).innerHTML = `<input type="text" value="${dado.quantidade}" oninput="dados[${index}].quantidade = this.value;">`;
+                row.insertCell(4).innerHTML = `<input type="text" value="${dado.endereco}" oninput="dados[${index}].endereco = this.value;">`;
+                const excluirCell = row.insertCell(5);
+                const excluirBtn = document.createElement('button');
+                excluirBtn.textContent = 'Excluir';
+                excluirBtn.onclick = function() {
+                    excluirLinha(index);
+                };
+                excluirCell.appendChild(excluirBtn);
+            });
+            tabelaContainer.style.display = 'block';
+            btnExibirPlanilha.textContent = 'Ocultar Planilha';
+            document.getElementById('baixarBtn').style.display = 'inline-block';
+            document.getElementById('incluirBtn').style.display = 'inline-block';
+        } else {
+            tabelaContainer.style.display = 'none';
+            btnExibirPlanilha.textContent = 'Exibir Planilha';
+            document.getElementById('baixarBtn').style.display = 'none';
+            document.getElementById('incluirBtn').style.display = 'none';
+        }
+    }
+
+    function incluirLinha() {
+        if (confirm('Tem certeza que deseja incluir uma linha?')) {
+            const tabelaCorpo = document.getElementById('tabelaCorpo');
+            const newRow = tabelaCorpo.insertRow();
+            newRow.insertCell(0).appendChild(criarSelectProdutos());
+            newRow.insertCell(1).appendChild(criarInput());
+            newRow.insertCell(2).appendChild(criarInput());
+            newRow.insertCell(3).appendChild(criarInput());
+            newRow.insertCell(4).appendChild(criarInput());
+            const excluirCell = newRow.insertCell(5);
+            const excluirBtn = document.createElement('button');
+            excluirBtn.textContent = 'Excluir';
+            excluirBtn.onclick = function() {
+                excluirLinha(newRow.rowIndex);
+            };
+            excluirCell.appendChild(excluirBtn);
+            exibirMensagem('Linha incluída com sucesso.');
+        }
+    }
+
+    function criarInput() {
+        const input = document.createElement('input');
+        input.type = 'text';
+        return input;
+    }
+
+    function criarSelectProdutos() {
+        const selectProduto = document.createElement('select');
+        selectProduto.innerHTML = '<option value="">Selecione...</option>';
+        for (const produto in produtos) {
+            const option = document.createElement('option');
+            option.value = produto;
+            option.textContent = produto;
+            selectProduto.appendChild(option);
+        }
+        return selectProduto;
+    }
+
+    function excluirLinha(index) {
+        if (confirm('Tem certeza que deseja excluir esta linha?')) {
+            document.getElementById('tabelaCorpo').deleteRow(index);
+            exibirMensagem('Linha excluída com sucesso.');
+        }
+    }
+
+    function baixarPlanilha() {
+        const csvContent = [];
+        dados.forEach(dado => {
+            const linha = [dado.nome, dado.lote, dado.validade, dado.quantidade, dado.endereco].join('\t');
+            csvContent.push(linha);
+        });
+        const csvData = csvContent.join('\n');
+        const blob = new Blob([csvData], { type: 'text/tsv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'planilha.tsv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function resetar() {
+        dados = [];
+        produtos = {};
+        exibirMensagem('Dados resetados com sucesso.');
+        localStorage.removeItem('dados');
+        localStorage.removeItem('produtos');
+        document.getElementById('selectProduto').innerHTML = '<option value="">Selecione...</option>';
+        document.getElementById('selecaoLoteContainer').style.display = 'none';
+        document.getElementById('detalhesLoteContainer').style.display = 'none';
+        document.getElementById('tabelaContainer').style.display = 'none';
+        document.getElementById('exibirPlanilhaBtn').textContent = 'Exibir Planilha';
+        document.getElementById('baixarBtn').style.display = 'none';
+        document.getElementById('incluirBtn').style.display = 'none';
+        document.getElementById('tabelaCorpo').innerHTML = '';
+    }
+
+    window.addEventListener('beforeunload', function(event) {
+        localStorage.setItem('dados', JSON.stringify(dados));
+        localStorage.setItem('produtos', JSON.stringify(produtos));
+    });
+</script>
+
+</body>
+</html>
+
